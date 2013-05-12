@@ -78,4 +78,4 @@ Links
 [License]: http://kieranties.mit-license.org/
 [Pushover]: https://pushover.net/
 [Pushover API]: https://pushover.net/api
-[new application]: ttps://pushover.net/apps/build
+[new application]: https://pushover.net/apps/build
