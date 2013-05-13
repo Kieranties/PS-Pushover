@@ -11,6 +11,9 @@
 
     .LINK
     https://pushover.net/api
+
+    .LINK 
+    https://github.com/Kieranties/PS-Pushover
 #>
 
 # The API endpoint used when sending messages
@@ -29,12 +32,7 @@ $pushoverPriorities = @{
     Quiet = -1
     Normal = 0
     Emergency = 1
-   <# 
-      Confirmation = 2
-
-      While the API suggests 2 is a valid option it currently returns 400 when 
-      added to the parameter request collection
-   #>
+    Confirmation = 2
 }
 
 <#
@@ -54,7 +52,7 @@ Function Test-Token{
 
 <#
     .SYNOPSIS
-    Throwse an error on the user param if given value is not valid
+    Throws an error on the user param if given value is not valid
 #>
 Function Test-User{
     param($given)
@@ -65,6 +63,34 @@ Function Test-User{
               + "Provide the -user parameter or call Set-PushoverSession -user <value> to`r`n" `
               + "set the parameter for the session lifetime"
     }
+}
+
+<#
+    .SYNOPSIS
+    Throws an error if the given -retry value is less than 30 seconds
+#>
+Function Test-Retry{
+    param([int]$given)
+
+    if($given -lt 30){
+        throw "Retry value must be 30 seconds or more"
+    }
+
+    return $true;
+}
+
+<#
+    .SYNOPSIS
+    Throws an error if the given expire value is greater than 86400 seconds (24 hours)
+#>
+Function Test-Expire{
+    param([int]$given)
+
+    if($given -gt 86400){
+        throw "Expire value must be 86400 seconds (24 hours) or less"
+    }
+
+    return $true;
 }
 
 <#
@@ -180,7 +206,13 @@ Function Set-PushoverSession{
         [string]$title,
         # The sound to use on the device.  Call Get-PushoverSounds for valid options
         [ValidateScript({Test-AgainstSounds $_})]
-        [string]$sound
+        [string]$sound,
+        # How often (in seconds) Pushover should retry sending an emergency message
+        [ValidateScript({Test-Retry $_})]
+        [int]$retry,
+        # How long (in seconds) an emergency message is valid.  Once -expire is reached an ackowledgement is no longer required
+        [ValidateScript({Test-Expire $_})]
+        [int]$expire
     )
 
     if($token){ $Script:token = $token }
@@ -189,6 +221,8 @@ Function Set-PushoverSession{
     if($device) { $Script:device = $device }
     if($title) { $Script:title = $title }
     if($sound) { $Script:sound = $sound }
+    if($retry) { $Script:retry = $retry }
+    if($expire) {$Script:expire = $expire }
 }
 
 <#
@@ -207,6 +241,8 @@ Function Get-PushoverSession{
         device = $Script:device
         title = $Script:title
         sound = $Script:sound
+        retry = $Script:retry
+        expire = $Script:expire
     }
 }
 
@@ -264,7 +300,13 @@ Function Send-PushoverMessage{
         [string]$urlTitle,
         # The timestamp used for the message
         [ValidateScript({[datetime]::parse($_)})]
-        $timestamp
+        $timestamp,
+        # How often (in seconds) Pushover should retry sending an emergency message
+        [ValidateScript({Test-Retry $_})]
+        [int]$retry,
+        # How long (in seconds) an emergency message is valid.  Once -expire is reached an ackowledgement is no longer required
+        [ValidateScript({Test-Expire $_})]
+        [int]$expire
     )
 
     # Validate
@@ -283,6 +325,8 @@ Function Send-PushoverMessage{
         url_title = $urlTitle
         priority = Resolve-MessagePriority $priority
         timestamp = ConvertTo-Epoch $timestamp
+        retry = $retry
+        expire = $expire
     }  
 
     # Send the message
@@ -292,3 +336,6 @@ Function Send-PushoverMessage{
 # Expose module content
 New-Alias spm Send-PushoverMessage
 Export-ModuleMember -Function *Pushover* -Alias *
+
+# Set default session params
+Set-PushoverSession -retry 30 -expire 86400
