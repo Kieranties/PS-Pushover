@@ -66,6 +66,11 @@ The full list of functions available are:
 + ``Send-PushoverMessage`` - Sends a message using the Pushover API
 + ``Set-PushoverSession`` - Sets properties for use throughout the current powershell session
 
+Examples
+--------
+
+Some [gist examples] are available
+
 -----
 
 Links
@@ -79,3 +84,4 @@ Links
 [Pushover]: https://pushover.net/
 [Pushover API]: https://pushover.net/api
 [new application]: https://pushover.net/apps/build
+[gist examples]: https://gist.github.com/Kieranties/5564690
