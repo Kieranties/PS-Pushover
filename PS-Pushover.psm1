@@ -16,9 +16,6 @@
     https://github.com/Kieranties/PS-Pushover
 #>
 
-# The API endpoint used when sending messages
-$pushoverEndpoint = "https://api.pushover.net/1/messages.json"
-
 # The valid collection of sounds allowed by pushover
 $pushoverSounds = @("pushover","bike","bugle","cashregister",
                     "classical", "cosmic", "falling", "gamelan",
@@ -154,9 +151,23 @@ Function ConvertTo-Epoch{
     if($datetime){
         [datetime]$parsed = [datetime]::Now
         if([datetime]::TryParse($datetime, [ref]$parsed)){
-            $epoch = Get-Date -Date "01/01/1970"
+            $epoch = Get-Date "01/01/1970"
             return (New-TimeSpan -Start $epoch -End $parsed).TotalSeconds
         }
+    }
+
+    $null
+}
+
+<#
+    .SYNOPSIS
+    Returns a datetime convereted from unix timestamp or null
+#>
+Function ConvertFrom-Epoch{
+    param($given)
+
+    if($given -gt 0){
+        return (Get-Date "01/01/1970").AddSeconds($given)
     }
 
     $null
@@ -303,10 +314,10 @@ Function Send-PushoverMessage{
         $timestamp,
         # How often (in seconds) Pushover should retry sending an emergency message
         [ValidateScript({Test-Retry $_})]
-        [int]$retry,
+        [int]$retry = $Script:retry,
         # How long (in seconds) an emergency message is valid.  Once -expire is reached an ackowledgement is no longer required
         [ValidateScript({Test-Expire $_})]
-        [int]$expire
+        [int]$expire = $Script:expire
     )
 
     # Validate
@@ -330,9 +341,43 @@ Function Send-PushoverMessage{
     }  
 
     # Send the message
-    $parameters | Invoke-RestMethod -Uri $pushoverEndpoint -Method Post
+    $parameters | Invoke-RestMethod -Uri "https://api.pushover.net/1/messages.json" -Method Post
 }
 
+<#
+    .SYNOPSIS
+    Get details of the recipt of an emergency message
+
+    .DESCRIPTION
+    Given a receipt displays data detailing when the message was delivered, 
+    acknowledged, expired and more
+
+    A receipt is provided when Send-PushoverMessage is passed a -priority of 2
+#>
+Function Confirm-PushoverReceipt{
+    param(
+        [Parameter(ValueFromPipelineByPropertyName=$true,Mandatory=$true)]
+        $receipt,
+        # Required if not set using Set-PushoverSession.  The api token for the application
+        [string]$token = $Script:token
+    )
+
+    Test-Token $token
+
+    $format = @(
+        @{n="Acknowledged"; e={$_.Acknowledged -eq 1}},
+        @{n="AcknowledgedAt"; e={ConvertFrom-Epoch $_.Acknowledged_At}},
+        @{n="LastDeliveredAt"; e={ConvertFrom-Epoch $_.Last_Delivered_At}},
+        @{n="Expired"; e={$_.Expired -eq 1}},
+        @{n="ExpiresAt"; e={ConvertFrom-Epoch $_.Expires_At}},
+        @{n="CalledBack"; e={$_.Called_Back -eq 1}},
+        @{n="CalledBackAt"; e={ConvertFrom-Epoch $_.Called_Back_At}},
+        @{n="Receipt"; e={$receipt}}
+    )
+
+    Invoke-RestMethod -Uri "https://api.pushover.net/1/receipts/$receipt.json?token=$token" | select $format
+    
+}
 # Expose module content
 New-Alias spm Send-PushoverMessage
 Export-ModuleMember -Function *Pushover* -Alias *
