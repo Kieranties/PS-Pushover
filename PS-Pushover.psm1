@@ -341,7 +341,7 @@ Function Send-PushoverMessage{
     }  
 
     # Send the message
-    $parameters | Invoke-RestMethod -Uri "https://api.pushover.net/1/messages.json" -Method Post
+    $parameters | Invoke-RestMethod -Uri "https://api.pushover.net/1/messages.json" -Method Post -ContentType "application/x-www-form-urlencoded; charset=utf-8"
 }
 
 <#
